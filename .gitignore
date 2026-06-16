@@ -14,6 +14,9 @@ Leetlab-cluster
 .env.test.local
 .env.production.local
 
+scripts
+
+seed-problems.json
 # Testing
 coverage
 

@@ -377,6 +377,7 @@ export const LANGUAGES: { id: number; name: string; key: string; monaco: string 
   { id: 63, name: "JavaScript", key: "JAVASCRIPT", monaco: "javascript" },
   { id: 62, name: "Java", key: "JAVA", monaco: "java" },
   { id: 54, name: "C++", key: "CPP", monaco: "cpp" },
+  { id: 50, name: "C", key: "C", monaco: "c" },
 ];
 export const ratingsApi = {
   updateContest: (id: string) => api.post(`/ratings/contest/${id}/update`),
