@@ -545,7 +545,7 @@ export default function ProblemDetail() {
                             {ex.input !== undefined && (
                               <div className="flex gap-2">
                                 <span className="font-semibold text-muted-foreground shrink-0 w-12">Input:</span>
-                                <code className="font-mono bg-muted/40 px-1.5 py-0.5 rounded text-xs">{String(ex.input) || "none"}</code>
+                                <code className="font-mono bg-muted/40 px-1.5 py-0.5 rounded text-xs whitespace-pre-wrap break-all">{String(ex.input) || "none"}</code>
                               </div>
                             )}
                             {ex.output !== undefined && (
