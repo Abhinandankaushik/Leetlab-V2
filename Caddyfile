@@ -1,0 +1,21 @@
+{$DOMAIN} {
+	encode gzip zstd
+
+	# Backend REST API (internal only — reachable via this reverse proxy)
+	handle /api/* {
+		reverse_proxy backend:3000
+	}
+
+	# Real-time discussions WebSocket relay (internal only)
+	handle /ws* {
+		reverse_proxy ws:4001
+	}
+
+	# Frontend single-page app (static build). Any unknown path falls back to
+	# index.html so client-side routing (React Router) keeps working.
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

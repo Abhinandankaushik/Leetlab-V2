@@ -1,0 +1,99 @@
+# Production stack for LeetLab.
+#
+# Only Caddy is published to the internet (ports 80/443). The backend, ws,
+# postgres and redis are reachable ONLY inside the internal Docker network —
+# users never hit them directly. Caddy reverse-proxies /api and /ws to them.
+#
+# Run:   docker compose -f docker-compose.prod.yml up -d --build
+# Values for ${...} come from a .env file next to this one (see .env.production.example).
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - frontend_dist:/srv:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      frontend-build:
+        condition: service_completed_successfully
+      backend:
+        condition: service_started
+      ws:
+        condition: service_started
+
+  # One-shot: builds the SPA into the shared frontend_dist volume, then exits.
+  frontend-build:
+    build:
+      context: ./apps/frontend
+      dockerfile: Dockerfile.prod
+    environment:
+      # Same-origin: the browser calls the API/WS through Caddy on the same domain.
+      - VITE_API_URL=/api/v1
+      - VITE_WS_URL=${WS_PUBLIC_URL}
+      - VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY:-}
+    volumes:
+      - frontend_dist:/output
+
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    restart: unless-stopped
+    # Internal only — NOT published to the host/internet.
+    expose:
+      - "3000"
+    environment:
+      # Managed Postgres (Neon). Full connection string with ?sslmode=require.
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - NODE_ENV=production
+      - ALLOWED_ORIGINS=${PUBLIC_URL}
+      - REDIS_URL=redis://redis:6379
+      - QUEUE_ENABLED=true
+      - EXECUTION_CONCURRENCY=5
+      # Which executor pools to warm at boot. Driven by .env so you can add
+      # languages later without editing this file. Valid: python,node,java,gcc
+      # (gcc serves both C and C++). Falls back to python,gcc if unset.
+      - EXECUTOR_LANGUAGES=${EXECUTOR_LANGUAGES:-python,gcc}
+      - CLERK_SECRET_KEY=${CLERK_SECRET_KEY:-}
+    # Override the image default (which waits for a local postgres-db container
+    # and runs migrations). The schema already exists in Neon, so skip migrations
+    # and just start the server. (Prisma client is still generated at build time.)
+    command: ["sh", "-c", "npm run start -w backend"]
+    volumes:
+      # Lets the backend drive the host Docker Engine for the warm-container
+      # code executor (code runs in sandboxed containers via the socket).
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - redis
+
+  ws:
+    build:
+      context: .
+      dockerfile: apps/ws/Dockerfile
+    restart: unless-stopped
+    expose:
+      - "4001"
+    environment:
+      - WS_PORT=4001
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+
+volumes:
+  redis_data:
+  frontend_dist:
+  caddy_data:
+  caddy_config:
