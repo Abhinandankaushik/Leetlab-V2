@@ -31,7 +31,11 @@ jobs:
           context: .
           file: apps/backend/Dockerfile
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/leetlab-backend:${{ github.sha }}
+          # The sha tag is what the k8s GitOps step pins; "latest" is what
+          # docker-compose.prod.yml pulls on the single-host deployment.
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/leetlab-backend:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/leetlab-backend:latest
 
       # 4. Build the WEBSOCKET image and push it
       - name: Build & push ws
@@ -40,7 +44,9 @@ jobs:
           context: .
           file: apps/ws/Dockerfile
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/leetlab-ws:${{ github.sha }}
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/leetlab-ws:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/leetlab-ws:latest
 
       # 5. Build the FRONTEND image and push it
       - name: Build & push frontend

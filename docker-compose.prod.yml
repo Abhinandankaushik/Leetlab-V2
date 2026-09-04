@@ -4,7 +4,13 @@
 # postgres and redis are reachable ONLY inside the internal Docker network —
 # users never hit them directly. Caddy reverse-proxies /api and /ws to them.
 #
-# Run:   docker compose -f docker-compose.prod.yml up -d --build
+# The backend and ws images are built by .github/workflows/cd_prod.yml and pulled
+# from Docker Hub, so the server never runs npm install. Only the frontend is
+# built here, because Vite inlines the VITE_* values at build time.
+#
+# Deploy:  docker compose -f docker-compose.prod.yml pull
+#          docker compose -f docker-compose.prod.yml up -d --build
+#
 # Values for ${...} come from a .env file next to this one (see .env.production.example).
 
 services:
@@ -43,9 +49,10 @@ services:
       - frontend_dist:/output
 
   backend:
-    build:
-      context: .
-      dockerfile: apps/backend/Dockerfile
+    # Pre-built by the CD workflow and pulled from Docker Hub — the server never
+    # runs npm install / prisma generate. Pin a commit sha in .env to roll back:
+    #   BACKEND_IMAGE=abhii1716/leetlab-backend:<sha>
+    image: ${BACKEND_IMAGE:-abhii1716/leetlab-backend:latest}
     restart: unless-stopped
     # Internal only — NOT published to the host/internet.
     expose:
@@ -76,9 +83,8 @@ services:
       - redis
 
   ws:
-    build:
-      context: .
-      dockerfile: apps/ws/Dockerfile
+    # Pre-built by the CD workflow, same as the backend.
+    image: ${WS_IMAGE:-abhii1716/leetlab-ws:latest}
     restart: unless-stopped
     expose:
       - "4001"
