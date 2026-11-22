@@ -1,0 +1,76 @@
+# Coolify variant of docker-compose.prod.yml: Coolify's proxy owns ports 80/443 and
+# Cloudflare terminates TLS, so Caddy publishes nothing and serves plain HTTP on :80.
+# Requires "Preserve repository during deployment" in Coolify so ./Caddyfile is present.
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      - DOMAIN=${DOMAIN:-:80}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - frontend_dist:/srv:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      frontend-build:
+        condition: service_completed_successfully
+      backend:
+        condition: service_started
+      ws:
+        condition: service_started
+
+  frontend-build:
+    build:
+      context: ./apps/frontend
+      dockerfile: Dockerfile.prod
+    exclude_from_hc: true
+    environment:
+      - VITE_API_URL=/api/v1
+      - VITE_WS_URL=${WS_PUBLIC_URL}
+      - VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY:-}
+    volumes:
+      - frontend_dist:/output
+
+  backend:
+    image: ${BACKEND_IMAGE:-abhii1716/leetlab-backend:latest}
+    restart: unless-stopped
+    expose:
+      - "3000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - NODE_ENV=production
+      - ALLOWED_ORIGINS=${PUBLIC_URL}
+      - REDIS_URL=redis://redis:6379
+      - QUEUE_ENABLED=true
+      - EXECUTION_CONCURRENCY=5
+      - EXECUTOR_LANGUAGES=${EXECUTOR_LANGUAGES:-python,gcc}
+      - CLERK_SECRET_KEY=${CLERK_SECRET_KEY:-}
+    command: ["sh", "-c", "npm run start -w backend"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - redis
+
+  ws:
+    image: ${WS_IMAGE:-abhii1716/leetlab-ws:latest}
+    restart: unless-stopped
+    expose:
+      - "4001"
+    environment:
+      - WS_PORT=4001
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+
+volumes:
+  redis_data:
+  frontend_dist:
+  caddy_data:
+  caddy_config:
