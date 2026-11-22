@@ -25,6 +25,7 @@ services:
     build:
       context: ./apps/frontend
       dockerfile: Dockerfile.prod
+    restart: "no"
     exclude_from_hc: true
     environment:
       - VITE_API_URL=/api/v1
