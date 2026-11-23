@@ -49,6 +49,8 @@ services:
       - EXECUTION_CONCURRENCY=5
       - EXECUTOR_LANGUAGES=${EXECUTOR_LANGUAGES:-python,gcc}
       - CLERK_SECRET_KEY=${CLERK_SECRET_KEY:-}
+      # Neon is ~270ms away; Node 22 aborts each connect attempt at 250ms by default.
+      - NODE_OPTIONS=--network-family-autoselection-attempt-timeout=2000
     command: ["sh", "-c", "npm run start -w backend"]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
